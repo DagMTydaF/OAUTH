@@ -1,0 +1,6 @@
+rid$001
+id$TOTPCODE
+discription$Generates 6 Digit Login Codes TOTP
+workfolder$%root%/totp_code
+runfile$source.py
+functions$!check_code&*code&*secret!generate_secret&length!totp&*secret&digits&interval!generate_qrcode&*secret&*accountname&issuer
