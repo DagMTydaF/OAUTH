@@ -97,36 +97,53 @@ def call_function(module, func_name: str, **kwargs):
     return func(**kwargs)
 
 def register(register_user, totp_code, email_system):
-    username = input("USER: ")
-    password = input("PASS: ")
-    email = input("EMAIL: ")
-    phone = input("PHO: ")
+    username = call_function(gui, "_input", input_type="str", prompt="Username $> ")
+    password = call_function(gui, "_input", input_type="password", prompt="Password $> ")
+    email = call_function(gui, "_input", input_type="str", prompt="Email $> ")
+    phone = call_function(gui, "_input", input_type="str", prompt="Phone $> ")
+
     totp = (False, "")
     email_otp =(False, "", "")
 
     while True:
         resp = call_function(register_user, "register", username=username, password=password, email=email, phone=phone, totp=totp, email_otp=email_otp)
-        print(resp)
 
         if not resp["success"]:
-            print(resp["error"]["text"])
             if resp["error"]["code"] == "8x01":
-                username = input("USER: ")
+                call_function(gui, "space")
+                call_function(gui, "_print", text="Username Taken", print_type="error", item_type="text")
+                username = call_function(gui, "_input", input_type="str", prompt="Username $> ")
 
             elif resp["error"]["code"] == "8x02":
+                call_function(gui, "space")
+                call_function(gui, "_print", text="Authenticator App Required.", print_type="warning", item_type="text")
+
                 secret = call_function(totp_code, "generate_secret")
                 qrcode = call_function(totp_code, "generate_qrcode", secret=secret, accountname=email, issuer="PRGA-SECURITY")
                 qrcode.print_ascii()
 
+                call_function(gui, "_print", text="Enter The 6 Digit Code Generated From Your Authenticator App Required.", print_type="warning", item_type="text")
+                
+                attempt = 0
+
                 while True:
-                    code = input("TOTP: ")
+                    if attempt > 0:
+                        call_function(gui, "space")
+                        call_function(gui, "_print", text=f"The Entered 6 Digit Code Is Incorrect.", print_type="error", item_type="text")
+
+                    attempt += 1
+                    
+                    code = call_function(gui, "_input", input_type="str", prompt="6 Digit Code (AUTHA)$> ")
 
                     if call_function(totp_code, "check_code", secret=secret, code=code):
+                        call_function(gui, "_print", text="Authenticator App Successfully Added.", print_type="success", item_type="text")
                         break
 
                 totp = (True, secret)
 
             elif resp["error"]["code"] == "8x03":
+                call_function(gui, "space")
+                call_function(gui, "_print", text="Email Verification Required.", print_type="warning", item_type="text")
                 secret = call_function(totp_code, "generate_secret")
                 otp_code = call_function(totp_code, "totp", secret=secret, interval=600)
 
@@ -194,11 +211,20 @@ def register(register_user, totp_code, email_system):
                     """
 
                 call_function(email_system, "send", to_email=email, from_email="no-reply-verification@project-gamma.dev", subject=f"Your Verification Code Is: [{otp_code}]", content=email_content, idenity={"use_default": True})
+                call_function(gui, "_print", text=f"Enter The 6 Digit Code Sent to \"{email.split('@')[0][:4]}****@{email.split('@')[1]}\".", print_type="", item_type="text")
 
+                attempt = 0
                 while True:
-                    code = input("TOTP: ")
+                    if attempt > 0:
+                        call_function(gui, "space")
+                        call_function(gui, "_print", text=f"The Entered 6 Digit Code Is Incorrect.", print_type="error", item_type="text")
+
+                    attempt += 1
+
+                    code = call_function(gui, "_input", input_type="str", prompt="6 Digit Code (EMAIL)$> ")
 
                     if code == otp_code:
+                        call_function(gui, "_print", text="Email Successfully Verified.", print_type="success", item_type="text")
                         break
 
                 email_otp = (True, secret)
@@ -211,19 +237,18 @@ def login(login_user, totp_code, email_system):
     email_otp = {"code": None, "complete": False}
 
 
-    username = input("USER: ")
-    passw = input("PASSW: ")
+    username = call_function(gui, "_input", input_type="str", prompt="Username $> ")
+    password = call_function(gui, "_input", input_type="password", prompt="Password $> ")
 
     while True:
-        resp = call_function(login_user, "login", type="credentials", idenity={"username": username, "password": passw, "totp": totp, "email_otp": email_otp})
-
-        print(resp)
+        resp = call_function(login_user, "login", type="credentials", idenity={"username": username, "password": password, "totp": totp, "email_otp": email_otp})
 
         if not resp["success"]:
-            print(resp["error"]["text"])
-
             if resp["error"]["code"] in ["9x08", "9x09"]:
-                code = input("TOTP CODE: ")
+                call_function(gui, "space")
+                call_function(gui, "_print", text="Enter The 6 Digit Code Generated From Your Authenticator App.", print_type="", item_type="text")
+
+                code = call_function(gui, "_input", input_type="str", prompt="6 Digit Code (AUTHA)$> ")
 
                 totp["complete"] = call_function(totp_code, "check_code", secret=resp["idenity"]["totp_secret"], code=code)
                 totp["code"] = code
@@ -297,8 +322,19 @@ def login(login_user, totp_code, email_system):
 
                 call_function(email_system, "send", to_email=resp["idenity"]["email"], from_email="no-reply-verification@project-gamma.dev", subject=f"Your Verification Code Is: [{otp_code}]", content=email_content, idenity={"use_default": True})
 
+                attempt = 0
                 while True:
-                    code = input("OTP: ")
+                    if attempt == 0:
+                        call_function(gui, "space")
+                        call_function(gui, "_print", text=f"Enter The 6 Digit Code Sent to \"{resp['idenity']['email'].split('@')[0][:4]}****@{resp['idenity']['email'].split('@')[1]}\".", print_type="", item_type="text")
+
+                        attempt += 1
+
+                    else:
+                        call_function(gui, "space")
+                        call_function(gui, "_print", text=f"The Entered 6 Digit Code Is Incorrect.", print_type="error", item_type="text")
+
+                    code = call_function(gui, "_input", input_type="str", prompt="6 Digit Code (EMAIL)$> ")
 
                     if code == otp_code:
                         break
@@ -308,34 +344,66 @@ def login(login_user, totp_code, email_system):
             else:
                 break
 
-if __name__ == "__main__":
-    detected_modules = detect_modules(MODULES_ROOT_PATH)
-    
-    for module in detected_modules["modules"]:
-        print(detected_modules["modules"][module])
+        else:
+            return resp["idenity"]
 
-    gui_module = detected_modules["modules"]["totp_code"]
-    gui = load_module(gui_module["workfolder"], gui_module["runfile"], "gui")
+def get_user(login_user, register_user, totp_code, email_system):
+    call_function(gui, "space", length=2)
+    call_function(gui, "_print", text="1. Login | 2. Register", print_type="", item_type="text")
 
-    totp_module = detected_modules["modules"]["totp_code"]
-    totp_code = load_module(totp_module["workfolder"], totp_module["runfile"], "totp_code")
+    selection = call_function(gui, "_input", input_type="int", prompt="select $> ", options=["1", "2"])
 
-    regiser_module = detected_modules["modules"]["register_system"]
-    register_user = load_module(regiser_module["workfolder"], regiser_module["runfile"], "register_user")
-
-    login_module = detected_modules["modules"]["login_system"]
-    login_user = load_module(login_module["workfolder"], login_module["runfile"], "login_user")
-
-    email_module = detected_modules["modules"]["mail_system"]
-    email_system = load_module(email_module["workfolder"], email_module["runfile"], "email_system")
-
-    option = int(input("\n\n\n\nSELECT[1. Login/2. Register]> "))
-
-    if option == 1:
-        login(login_user, totp_code, email_system)
-
-    elif option == 2:
-        register(register_user, totp_code, email_system)
+    if selection == 1:
+        return login(login_user, totp_code, email_system)
 
     else:
-        raise(ValueError, "Invalid Option.")
+        register(register_user, totp_code, email_system)
+
+        return
+
+if __name__ == "__main__":
+    try:
+        app_version = "1.06.2"
+        app_author  = "Project-Gamma DEV"
+
+        running = True
+
+        user = {}
+
+        detected_modules = detect_modules(MODULES_ROOT_PATH)
+
+        gui_module = detected_modules["modules"]["gui_system"]
+        gui = load_module(gui_module["workfolder"], gui_module["runfile"], "gui")
+
+        totp_module = detected_modules["modules"]["totp_code"]
+        totp_code = load_module(totp_module["workfolder"], totp_module["runfile"], "totp_code")
+
+        regiser_module = detected_modules["modules"]["register_system"]
+        register_user = load_module(regiser_module["workfolder"], regiser_module["runfile"], "register_user")
+
+        login_module = detected_modules["modules"]["login_system"]
+        login_user = load_module(login_module["workfolder"], login_module["runfile"], "login_user")
+
+        email_module = detected_modules["modules"]["mail_system"]
+        email_system = load_module(email_module["workfolder"], email_module["runfile"], "email_system")
+
+        while running:
+            app_info = fr"info%App Version%{app_version}&info%App Author%{app_author}"
+
+            if not user:
+                app_info += r"&error%Login Status%not logged in!"
+
+            else:
+                app_info += fr"&info%Login Status%Logged In As {user['username']}"
+
+            call_function(gui, "clear")
+            call_function(gui, "_print", text="", print_type="", item_type="logo")
+            call_function(gui, "_print", text=app_info, print_type="", item_type="app-info")
+
+            if not user:
+                user = get_user(login_user, register_user, totp_code, email_system)
+
+    except KeyboardInterrupt:
+        call_function(gui, "space", length=2)
+        call_function(gui, "_print", text="USER EXITED/STOPPED!", print_type="error", item_type="text")
+        exit()
