@@ -1,0 +1,6 @@
+rid$000
+id$GUIS
+discription$Console User Interface
+workfolder$%root%/gui_system
+runfile$source.py
+functions$!input&*type&*return&options!print&*text&*type&item_type

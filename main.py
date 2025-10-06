@@ -96,15 +96,16 @@ def call_function(module, func_name: str, **kwargs):
 
     return func(**kwargs)
 
-def register(totp_code, register_user):
+def register(register_user, totp_code, email_system):
     username = input("USER: ")
     password = input("PASS: ")
     email = input("EMAIL: ")
     phone = input("PHO: ")
     totp = (False, "")
+    email_otp =(False, "", "")
 
     while True:
-        resp = call_function(register_user, "register", username=username, password=password, email=email, phone=phone, totp=totp)
+        resp = call_function(register_user, "register", username=username, password=password, email=email, phone=phone, totp=totp, email_otp=email_otp)
         print(resp)
 
         if not resp["success"]:
@@ -112,7 +113,7 @@ def register(totp_code, register_user):
             if resp["error"]["code"] == "8x01":
                 username = input("USER: ")
 
-            elif resp["error"]["code"]  == "8x02":
+            elif resp["error"]["code"] == "8x02":
                 secret = call_function(totp_code, "generate_secret")
                 qrcode = call_function(totp_code, "generate_qrcode", secret=secret, accountname=email, issuer="PRGA-SECURITY")
                 qrcode.print_ascii()
@@ -125,17 +126,96 @@ def register(totp_code, register_user):
 
                 totp = (True, secret)
 
+            elif resp["error"]["code"] == "8x03":
+                secret = call_function(totp_code, "generate_secret")
+                otp_code = call_function(totp_code, "totp", secret=secret, interval=600)
+
+                email_content = rf"""<!DOCTYPE html>
+                    <html lang="en">
+                      <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Your Verification Code</title>
+                      </head>
+                      <body style="margin:0; padding:0; background-color:#f4f7fb; font-family:Arial, Helvetica, sans-serif; color:#333333;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                          <tr>
+                            <td align="center" style="padding: 24px 0;">
+                              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background-color:#ffffff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+                                <tr>
+                                  <td align="center" style="padding: 32px 24px 16px 24px;">
+                                    <h2 style="margin:0; font-size:22px; color:#0f172a;">Hello {username},</h2>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" style="padding: 0 24px 24px 24px;">
+                                    <p style="margin:8px 0 18px 0; font-size:16px; color:#475569; line-height:1.5;">
+                                      Please use the verification code below to continue your request.
+                                    </p>
+
+                                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                                      <tr>
+                                        <td align="center" bgcolor="#f8fafc" style="padding: 14px 28px; border-radius:8px; border:1px solid #e2e8f0;">
+                                          <span style="font-size:28px; letter-spacing:6px; font-weight:bold; font-family: monospace; color:#0f172a;">
+                                            {otp_code}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    </table>
+
+                                    <p style="margin:20px 0 0 0; font-size:14px; color:#64748b;">
+                                      This code is valid for <strong>10 minutes</strong>.
+                                    </p>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" style="padding: 24px 24px 16px 24px;">
+                                    <p style="margin:0; font-size:14px; color:#94a3b8;">
+                                      If you didn’t request this code, please ignore this message.
+                                    </p>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" bgcolor="#f1f5f9" style="padding: 16px 24px; border-bottom-left-radius:8px; border-bottom-right-radius:8px;">
+                                    <p style="margin:0; font-size:13px; color:#94a3b8;">
+                                      © 2025 Project-Gamma Security/Verification. All rights reserved.
+                                    </p>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                      </body>
+                    </html>
+                    """
+
+                call_function(email_system, "send", to_email=email, from_email="no-reply-verification@project-gamma.dev", subject=f"Your Verification Code Is: [{otp_code}]", content=email_content, idenity={"use_default": True})
+
+                while True:
+                    code = input("TOTP: ")
+
+                    if code == otp_code:
+                        break
+
+                email_otp = (True, secret)
+
         else:
             break
 
-def login(totp_code, login_user):
+def login(login_user, totp_code, email_system):
     totp = {"code": None, "complete": False}
+    email_otp = {"code": None, "complete": False}
+
 
     username = input("USER: ")
     passw = input("PASSW: ")
 
     while True:
-        resp = call_function(login_user, "login", type="credentials", idenity={"username": username, "password": passw, "totp": totp})
+        resp = call_function(login_user, "login", type="credentials", idenity={"username": username, "password": passw, "totp": totp, "email_otp": email_otp})
 
         print(resp)
 
@@ -146,8 +226,84 @@ def login(totp_code, login_user):
                 code = input("TOTP CODE: ")
 
                 totp["complete"] = call_function(totp_code, "check_code", secret=resp["idenity"]["totp_secret"], code=code)
-                print(totp["complete"])
                 totp["code"] = code
+
+            elif resp["error"]["code"] in ["9x10", "9x11"]:
+                offset = call_function(totp_code, "generate_secret")
+                otp_code = call_function(totp_code, "totp", secret=resp["idenity"]["email_otp"]+offset, interval=600)
+                
+                email_content = rf"""<!DOCTYPE html>
+                    <html lang="en">
+                      <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Your Verification Code</title>
+                      </head>
+                      <body style="margin:0; padding:0; background-color:#f4f7fb; font-family:Arial, Helvetica, sans-serif; color:#333333;">
+                        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                          <tr>
+                            <td align="center" style="padding: 24px 0;">
+                              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background-color:#ffffff; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+                                <tr>
+                                  <td align="center" style="padding: 32px 24px 16px 24px;">
+                                    <h2 style="margin:0; font-size:22px; color:#0f172a;">Hello {resp["idenity"]["username"]},</h2>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" style="padding: 0 24px 24px 24px;">
+                                    <p style="margin:8px 0 18px 0; font-size:16px; color:#475569; line-height:1.5;">
+                                      Please use the verification code below to continue your request.
+                                    </p>
+
+                                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                                      <tr>
+                                        <td align="center" bgcolor="#f8fafc" style="padding: 14px 28px; border-radius:8px; border:1px solid #e2e8f0;">
+                                          <span style="font-size:28px; letter-spacing:6px; font-weight:bold; font-family: monospace; color:#0f172a;">
+                                            {otp_code}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    </table>
+
+                                    <p style="margin:20px 0 0 0; font-size:14px; color:#64748b;">
+                                      This code is valid for <strong>10 minutes</strong>.
+                                    </p>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" style="padding: 24px 24px 16px 24px;">
+                                    <p style="margin:0; font-size:14px; color:#94a3b8;">
+                                      If you didn’t request this code, please ignore this message.
+                                    </p>
+                                  </td>
+                                </tr>
+
+                                <tr>
+                                  <td align="center" bgcolor="#f1f5f9" style="padding: 16px 24px; border-bottom-left-radius:8px; border-bottom-right-radius:8px;">
+                                    <p style="margin:0; font-size:13px; color:#94a3b8;">
+                                      © 2025 Project-Gamma Security/Verification. All rights reserved.
+                                    </p>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                      </body>
+                    </html>
+                    """
+
+                call_function(email_system, "send", to_email=resp["idenity"]["email"], from_email="no-reply-verification@project-gamma.dev", subject=f"Your Verification Code Is: [{otp_code}]", content=email_content, idenity={"use_default": True})
+
+                while True:
+                    code = input("OTP: ")
+
+                    if code == otp_code:
+                        break
+
+                email_otp = {"code": code, "offset": offset, "complete": True}
 
             else:
                 break
@@ -158,6 +314,9 @@ if __name__ == "__main__":
     for module in detected_modules["modules"]:
         print(detected_modules["modules"][module])
 
+    gui_module = detected_modules["modules"]["totp_code"]
+    gui = load_module(gui_module["workfolder"], gui_module["runfile"], "gui")
+
     totp_module = detected_modules["modules"]["totp_code"]
     totp_code = load_module(totp_module["workfolder"], totp_module["runfile"], "totp_code")
 
@@ -167,13 +326,16 @@ if __name__ == "__main__":
     login_module = detected_modules["modules"]["login_system"]
     login_user = load_module(login_module["workfolder"], login_module["runfile"], "login_user")
 
+    email_module = detected_modules["modules"]["mail_system"]
+    email_system = load_module(email_module["workfolder"], email_module["runfile"], "email_system")
+
     option = int(input("\n\n\n\nSELECT[1. Login/2. Register]> "))
 
     if option == 1:
-        login(totp_code, login_user)
+        login(login_user, totp_code, email_system)
 
     elif option == 2:
-        register(totp_code, register_user)
+        register(register_user, totp_code, email_system)
 
     else:
         raise(ValueError, "Invalid Option.")

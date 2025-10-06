@@ -76,7 +76,7 @@ def generate_user_id(username, offset):
     
     return user_id
 
-def register(username, password, email, phone, totp=(False, "")):
+def register(username, password, email, phone, totp=(False, ""), email_otp=(False, "", "")):
     unsecure_numbers = ("381", "7", "387")
 
     if not username_valid(username.lower()):
@@ -113,6 +113,13 @@ def register(username, password, email, phone, totp=(False, "")):
 
     rhash = sha256(f"{username.lower()}{email}".encode()).hexdigest()
 
+    if not email_otp[1]:
+        return {
+            "success": False,
+            "error": {"text": "EMAIL OTP REQUIRED.", "code": "8x03"},
+            "user": {}
+        }
+
     conn = mysql.connector.connect(
         host="localhost",
         user=MASTER_USER,
@@ -123,16 +130,17 @@ def register(username, password, email, phone, totp=(False, "")):
     
     sql = """
     INSERT INTO USERS 
-    (user_id, username, passwordhash, totp_status, totp_secret, token, tokenhash, rhash, security, email, phone)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    (user_id, username, passwordhash, totp_status, totp_secret, email_otp, token, tokenhash, rhash, security, email, phone)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
-    
+
     values = (
         user_id,
         username.lower(),
         password_hash,
         totp[0],
         totp[1] if totp[0] else "",
+        email_otp[1],
         token,
         sha256(str(token).encode()).hexdigest(),
         rhash,

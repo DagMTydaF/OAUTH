@@ -55,13 +55,35 @@ def login_with_token(idenity):
             }
         }
 
-    elif idenity["totp"]["complete"]:
+
+    elif idenity["totp"]["complete"] and not idenity["email_otp"]["complete"]:
         if not (idenity["totp"]["code"] == totp(user["totp_secret"])):
             return {
                 "success": False,
                 "error": {"text": "TOTP REQUIRED.", "code": "9x09"},
                 "idenity": {
                     "totp_secret": user["totp_secret"]
+                }
+            }
+
+    elif not idenity["email_otp"]["complete"]:
+        return {
+                "success": False,
+                "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x10"},
+                "idenity": {
+                    "email_otp": user["email_otp"],
+                    "email": user["email"]
+                }
+            }
+
+    elif idenity["email_otp"]["complete"]:
+        if not (idenity["email_otp"]["code"] == totp(user["email_otp"] + idenity["email_otp"]["offset"], interval=600)):
+            return {
+                "success": False,
+                "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x11"},
+                "idenity": {
+                    "email_otp": user["email_otp"],
+                    "email": user["email"]
                 }
             }
 
@@ -109,13 +131,36 @@ def login_with_credentials(idenity):
             }
         }
 
-    elif idenity["totp"]["complete"]:
+    elif idenity["totp"]["complete"] and not idenity["email_otp"]["complete"]:
         if not (idenity["totp"]["code"] == totp(user["totp_secret"])):
             return {
                 "success": False,
                 "error": {"text": "TOTP REQUIRED.", "code": "9x09"},
                 "idenity": {
                     "totp_secret": user["totp_secret"]
+                }
+            }
+
+    if not idenity["email_otp"]["complete"]:
+        return {
+                "success": False,
+                "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x10"},
+                "idenity": {
+                    "username": user["username"],
+                    "email_otp": user["email_otp"],
+                    "email": user["email"]
+                }
+            }
+
+    elif idenity["email_otp"]["complete"]:
+        if not (idenity["email_otp"]["code"] == totp(user["email_otp"] + idenity["email_otp"]["offset"], interval=600)):
+            return {
+                "success": False,
+                "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x11"},
+                "idenity": {
+                    "username": user["username"],
+                    "email_otp": user["email_otp"],
+                    "email": user["email"]
                 }
             }
 

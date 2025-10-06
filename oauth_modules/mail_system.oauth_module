@@ -1,0 +1,6 @@
+rid$004
+id$EMAILSYS
+discription$Sends Emails
+workfolder$%root%/mail_system
+runfile$source.py
+functions$!send&*to_email&*from_email&*subject&*content&*idenity
