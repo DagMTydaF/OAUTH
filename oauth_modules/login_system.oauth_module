@@ -1,6 +1,0 @@
-rid$002
-id$LSYS
-discription$User Login System
-workfolder$%root%/login_system
-runfile$source.py
-functions$!login&*type&*idenity!login_with_credentials&*idenity!login_with_token&*idenity!totp&*secret&digits&interval

@@ -1,6 +1,0 @@
-rid$000
-id$GUIS
-discription$Console User Interface
-workfolder$%root%/gui_system
-runfile$source.py
-functions$!_input&*input_type&*prompt&return_type&options!_print&*text&*print_type&item_type!current_time!clear!space&length
