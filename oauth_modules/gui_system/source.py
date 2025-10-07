@@ -1,65 +1,36 @@
-import colorama
 import os
+import sys
 import time
-import shutil
 import getpass
+from colorama import Fore, Style, init
 
-def current_time():
-    return time.strftime("%H:%M:%S")
+init(autoreset=True)
+
+_LOGO_CACHE = None
+
+def _fast_write_block(text):
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 def clear():
-    os.system("clear")
+    if sys.platform.startswith("win"):
+        os.system("cls")
+    else:
+        sys.stdout.write("\033c")
+        sys.stdout.flush()
+
 
 def space(length=1):
-    print("\n" * length)
-    
-def _input(input_type, prompt, return_type="value", options=None):
-    colorama.init(autoreset=True)
-    
-    while True:
-        if input_type == "password":
-            user_input = getpass.getpass(f"{colorama.Fore.CYAN}{current_time()} Input  | {prompt} ")
-        else:
-            user_input = input(f"{colorama.Fore.CYAN}{current_time()} Input  | {prompt} ")
+    sys.stdout.write("\n" * (length if length > 0 else 1))
+    sys.stdout.flush()
 
-        if input_type == "int":
-            if user_input.isdigit():
-                return int(user_input)
-            else:
-                print(f"{colorama.Fore.RED}Error: Please enter a valid integer.")
-                continue
-        
-        elif input_type == "str":
-            return str(user_input)
 
-        elif input_type == "option":
-            if options is None:
-                raise ValueError("Options must be provided for 'option' input type.")
-
-            if isinstance(options, dict):
-                if user_input in options:
-                    return options[user_input] if return_type == "map" else user_input
-                else:
-                    print(f"{colorama.Fore.YELLOW}Invalid option! Choose one: {list(options.keys())}")
-                    continue
-
-            elif isinstance(options, list):
-                if user_input in options:
-                    return user_input
-                else:
-                    print(f"{colorama.Fore.YELLOW}Invalid option! Choose one: {options}")
-                    continue
-            else:
-                raise TypeError("Options must be a list or dict.")
-
-        else:
-            return user_input
-
-def _print(text, print_type, item_type="text"):
-    colorama.init(autoreset=True)
+def _print(text="", print_type="", item_type="text"):
+    global _LOGO_CACHE
 
     if item_type == "logo":
-        logo = r"""
+        if _LOGO_CACHE is None:
+            _LOGO_CACHE = r"""
          _______                                                     __             ______                                                  
         |       \                                                   |  \           /      \                                                 
         | $$$$$$$\  ______    ______       __   ______    _______  _| $$_         |  $$$$$$\  ______   ______ ____   ______ ____    ______  
@@ -72,35 +43,64 @@ def _print(text, print_type, item_type="text"):
                                     |  \__/ $$                                                                                              
                                      \$$    $$                                                                                              
                                       \$$$$$$                                                                                               
-        """
+        """.rstrip("\n")
 
-        terminal_width = shutil.get_terminal_size().columns
-        colored_logo = colorama.Fore.LIGHTYELLOW_EX + colorama.Style.BRIGHT + "\n".join(
-            line.center(terminal_width) for line in logo.splitlines()
-        )
+        _fast_write_block(Fore.YELLOW + _LOGO_CACHE + Style.RESET_ALL + "\n")
+        return
 
-        print(colored_logo + "\n")
+    if item_type == "app-info":
+        try:
+            parts = text.split("&")
+            for p in parts:
+                if not p.strip():
+                    continue
+                kind, key, val = p.split("%", 2)
+                if kind == "info":
+                    color = Fore.GREEN
+                elif kind == "error":
+                    color = Fore.RED
+                else:
+                    color = Fore.WHITE
+                _fast_write_block(f"{color}{key}: {val}{Style.RESET_ALL}\n")
+        except Exception as e:
+            _fast_write_block(Fore.RED + f"[APP-INFO ERROR] {e}\n" + Style.RESET_ALL)
+        return
 
-    elif item_type == "app-info":
-        application_data = text.split("&")
+    if print_type == "error":
+        color = Fore.RED
+    elif print_type == "success":
+        color = Fore.GREEN
+    elif print_type == "warning":
+        color = Fore.YELLOW
+    else:
+        color = Fore.WHITE
 
-        for information in application_data:
-            info_parts = information.split("%")
+    if "\n" in text and (len(text) > 100 or text.count("\n") > 3):
+        _fast_write_block(color + text + Style.RESET_ALL + "\n")
+    else:
+        sys.stdout.write(color + text + Style.RESET_ALL + "\n")
+        sys.stdout.flush()
 
-            _print(f"{info_parts[1]}: {info_parts[2]}", info_parts[0], "text")
+def _input(input_type="str", prompt="", options=None):
+    options = options or []
 
-    elif item_type == "text":
-        if print_type == "info":
-            print(f"{colorama.Fore.CYAN}{current_time()}  Info   | {text} ")
+    if input_type == "password":
+        sys.stdout.write(Fore.CYAN + prompt + Style.RESET_ALL)
+        sys.stdout.flush()
 
-        elif print_type == "error":
-            print(f"{colorama.Fore.RED}{current_time()}  Error  | {text} ")
+        return getpass.getpass("")
 
-        elif print_type == "warning":
-                print(f"{colorama.Fore.YELLOW}{current_time()} Warning | {text} ")
+    resp = input(Fore.CYAN + prompt + Style.RESET_ALL)
 
-        elif print_type == "success":
-                print(f"{colorama.Fore.GREEN}{current_time()} Success | {text} ")
+    if options and str(resp) not in [str(o) for o in options]:
+        sys.stdout.write(Fore.RED + "Invalid selection.\n" + Style.RESET_ALL)
+        sys.stdout.flush()
+        return _input(input_type, prompt, options)
 
-        else:
-            print(f"{colorama.Fore.LIGHTBLACK_EX}{current_time()} | {text} ")
+    if input_type == "int":
+        try:
+            return int(resp)
+        except Exception:
+            return resp
+
+    return resp
