@@ -1,0 +1,40 @@
+-- 1. Create the database
+CREATE DATABASE IF NOT EXISTS OAUTH;
+USE OAUTH;
+
+-- 2. Create USERS table
+CREATE TABLE IF NOT EXISTS USERS (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    passwordhash TEXT NOT NULL,
+    totp_status BOOLEAN DEFAULT FALSE,
+    totp_secret TEXT,
+    email_otp VARCHAR(10),
+    token TEXT,
+    tokenhash TEXT,
+    rhash TEXT,
+    security TEXT,
+    email VARCHAR(255) UNIQUE,
+    phone VARCHAR(20)
+);
+
+-- 3. Create views
+CREATE OR REPLACE VIEW register_user_view AS
+SELECT user_id, username, tokenhash
+FROM USERS;
+
+CREATE OR REPLACE VIEW login_user_view AS
+SELECT user_id, username, passwordhash, tokenhash, totp_status, totp_secret, email_otp, email
+FROM USERS;
+
+-- 4. Create register_user and assign privileges
+CREATE USER IF NOT EXISTS 'register_user' IDENTIFIED BY 'kMm3DJRaTA$';
+REVOKE ALL PRIVILEGES ON OAUTH.USERS FROM 'register_user';
+REVOKE ALL PRIVILEGES ON OAUTH.register_user_view FROM 'register_user';
+GRANT INSERT ON OAUTH.USERS TO 'register_user';
+GRANT SELECT ON OAUTH.register_user_view TO 'register_user';
+
+-- 5. Create login_user and assign privileges
+CREATE USER IF NOT EXISTS 'login_user' IDENTIFIED BY 'kMm3DJRaTA$';
+REVOKE ALL PRIVILEGES ON OAUTH.login_user_view FROM 'login_user';
+GRANT SELECT ON OAUTH.login_user_view TO 'login_user';
