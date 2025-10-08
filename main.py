@@ -2,8 +2,15 @@ import os
 import sys
 import time
 import hmac
+import json
+import base64
+import hmac
+import hashlib
+import time
+import uuid
 import pathlib
 import importlib.util
+from flask import Flask, request, jsonify, redirect, url_for, render_template, make_response
 
 MODULES_ROOT_PATH = "./oauth_modules"
 
@@ -26,7 +33,6 @@ def parse_functions(raw: str) -> dict:
 
         functions[name] = funcs
     return functions
-
 
 def detect_modules(modules_root_path: str) -> dict:
     root = pathlib.Path(modules_root_path)
@@ -60,7 +66,6 @@ def detect_modules(modules_root_path: str) -> dict:
         return {"success": False, "error": {"text": "No Modules Found.", "code": "6x06"}, "modules": {}}
 
     return {"success": True, "error": None, "modules": modules_detected}
-
 
 def load_module(workfolder: str, runfile: str, module_name: str):
     file_path = pathlib.Path(workfolder) / runfile
@@ -265,6 +270,157 @@ def get_user(login_user, register_user, totp_code, email_system):
     selection = call_function(gui, "_input", input_type="int", prompt="select $> ", options=["1", "2"])
     return login(login_user, totp_code, email_system) if selection == 1 else register(register_user, totp_code, email_system)
 
+login_sessions = {}
+
+def base64url_encode(data: bytes) -> str:
+    """Encode bytes to base64url string without padding"""
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+def generate_jwt_token(headers: dict, payload: dict, secret: str, expire_seconds: int = 3600) -> str:
+    payload_copy = payload.copy()
+    payload_copy["exp"] = int(time.time()) + expire_seconds
+
+    header_b64 = base64url_encode(json.dumps(headers, separators=(",", ":")).encode("utf-8"))
+    payload_b64 = base64url_encode(json.dumps(payload_copy, separators=(",", ":")).encode("utf-8"))
+
+    message = f"{header_b64}.{payload_b64}".encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), message, hashlib.sha256).digest()
+    signature_b64 = base64url_encode(signature)
+
+    token = f"{header_b64}.{payload_b64}.{signature_b64}"
+    return token
+
+def generate_login_session(TTL=300):
+    session_uuid = str(uuid.uuid4())
+    step = 0
+    auth_type = "username"
+    error = ""
+    error_text = ""
+    error_code = ""
+
+    login_sessions[session_uuid] = {
+        "step": step,
+        "auth_type": auth_type,
+        "exp": time.time() + TTL,
+        "username": None,
+        "password": None,
+        "email": None,
+        "email_encrypted": None,
+        "totp": {"code": None, "complete": False},
+        "email_otp": {"code": None, "offset": None, "complete": False}
+    }
+
+    return {"session": session_uuid, "step": step, "auth_type": auth_type}
+
+app = Flask(__name__)
+
+@app.route("/login", methods=["POST"])
+def login_post():
+    session = request.form.get("session")
+    step = int(request.form.get("step"))
+    auth_type = request.form.get("auth_type")
+
+    login_attempt = {}
+
+    if step == 0:
+        login_sessions[session]["username"] = request.form.get("username")
+        login_sessions[session]["password"] = request.form.get("password")
+
+    elif step == 1:
+        login_sessions[session]["totp"]["code"] = request.form.get("code")
+        login_sessions[session]["totp"]["complete"] = True
+
+    elif step == 2:
+        login_sessions[session]["email_otp"]["code"] = request.form.get("code")
+        login_sessions[session]["email_otp"]["complete"] = True
+
+    login_attempt = call_function(login_user, "login", type="credentials", idenity={"username": login_sessions[session]["username"], "password": login_sessions[session]["password"], "totp": login_sessions[session]["totp"], "email_otp": login_sessions[session]["email_otp"]})
+
+    if not login_attempt["success"]:
+        if login_attempt["error"]["code"] == "9x08":
+            step = 1
+            auth_type = "2fa"
+
+        elif login_attempt["error"]["code"] == "9x10":
+            login_sessions[session]["email_otp"]["offset"] = call_function(totp_code, "generate_secret")
+            otp_code = call_function(totp_code, "totp", secret=login_attempt["idenity"]["email_otp"] + login_sessions[session]["email_otp"]["offset"], interval=600)
+
+            email_template = register._email_template.replace("{username}", login_sessions[session]["username"]).replace("{otp_code}", otp_code)
+            call_function(email_system, "send", to_email=login_attempt["idenity"]["email"], from_email="no-reply-verification@project-gamma.dev", subject=f"Your Verification Code Is: [{otp_code}]", content=email_template, idenity={"use_default": True})
+
+            step = 2
+            auth_type = "email"
+            login_sessions[session]["email"] = login_attempt['idenity']['email']
+            login_sessions[session]["email_encrypted"] = f"{login_attempt['idenity']['email'].split('@')[0][:2]}****@{login_attempt['idenity']['email'].split('@')[1]}"
+
+        args = {}
+
+        args["session"] = session
+        args["step"] = step
+        args["auth_type"] = auth_type
+        args["error"] = "true"
+        args["error_code"] = err_code = login_attempt["error"]["code"]
+        args["error_text"]  =  login_attempt["error"]["text"]
+
+        return redirect(url_for("login_get", **args))
+
+    login_sessions.pop(session, None)
+
+    session_id = str(uuid.uuid4())
+
+    headers = {"alg": "HS256-V1", "typ": "JWT"}
+    payload = {"userid": login_attempt["idenity"]["userid"], "username": login_attempt["idenity"]["username"], "session": session_id}
+    secret = "mF8Zqv7QyRk1pXJwN6TgHsV9aB3uL0cD5eKj2YhWfA"
+
+    resp = make_response(redirect(url_for("account")))
+    resp.set_cookie("session_id", session_id, max_age=3600, httponly=True, samesite="Lax")
+    resp.set_cookie("user", f"\"username\": \"{login_attempt['idenity']['username']}\", \"userid\": \"{login_attempt['idenity']['userid']}\"", max_age=7200, httponly=True, samesite="Lax")
+    resp.set_cookie("token", generate_jwt_token(headers, payload, secret), max_age=3600, httponly=True, samesite="Lax")
+
+    return resp
+
+@app.route("/login", methods=["GET"])
+def login_get():
+    if "session" not in request.args or not login_sessions.get(request.args.get("session"), {}):
+        session_args = generate_login_session()
+        return redirect(url_for("login_get", **session_args))
+
+    session = request.args.get("session")
+    auth_type = request.args.get("auth_type", "username")
+    step = request.args.get("step")
+    error = request.args.get("error")
+    error_text = request.args.get("error_text")
+    error_code = request.args.get("error_code")
+
+    current_session = login_sessions[session]
+
+    if auth_type == "email":
+        return render_template("login_email.html", email=current_session["email_encrypted"], error_text=error_text, error_code=error_code)
+
+    elif auth_type in ("authenticator", "2fa"):
+        return render_template("login_authenticator.html", error_text=error_text, error_code=error_code)
+
+    else:
+        return render_template("login_credentials.html", error_text=error_text, error_code=error_code)
+
+@app.route("/account", methods=["GET"])
+def account():
+    cookies = request.cookies.to_dict()
+
+    return jsonify(cookies)
+
+if __name__ == '__main__':
+    detected_modules = detect_modules(MODULES_ROOT_PATH)
+    modules = detected_modules["modules"]
+
+    totp_code = load_module(modules["totp_code"]["workfolder"], modules["totp_code"]["runfile"], "totp_code")
+    register_user = load_module(modules["register_system"]["workfolder"], modules["register_system"]["runfile"], "register_user")
+    login_user = load_module(modules["login_system"]["workfolder"], modules["login_system"]["runfile"], "login_user")
+    email_system = load_module(modules["mail_system"]["workfolder"], modules["mail_system"]["runfile"], "email_system")
+
+    app.run(debug=True, host="0.0.0.0", port=5541)
+
+"""
 if __name__ == "__main__":
     try:
         app_version = "1.06.8"
@@ -304,4 +460,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         call_function(gui, "space", length=2)
         call_function(gui, "_print", text="USER EXITED/STOPPED!", print_type="error", item_type="text")
-        sys.exit(0)
+        sys.exit(0)"""

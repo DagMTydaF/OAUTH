@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login — Authenticator App</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f3f6ff; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .box { background: white; padding: 2em; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 300px; }
+        .error { color: #d9534f; margin-bottom: 1em; font-size: 0.9em; }
+        input { width: 100%; padding: 8px; margin: 6px 0; border-radius: 6px; border: 1px solid #ccc; text-align: center; font-size: 1.2em; letter-spacing: 2px; }
+        button { width: 100%; background: #6610f2; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #520dc2; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Enter Code</h2>
+        {% if error_text %}
+        <div class="error">{{ error_text }} <small>#{{ error_code }}</small></div>
+        {% endif %}
+        <form method="post" action="/login">
+            <input type="hidden" name="session" value="{{ request.args.get('session', '') }}">
+            <input type="hidden" name="step" value="{{ request.args.get('step', '') }}">
+            <input type="hidden" name="auth_type" value="{{ request.args.get('auth_type', '') }}">
+            <input type="text" name="code" placeholder="6-digit code" maxlength="6" required>
+            <button type="submit">Verify</button>
+        </form>
+    </div>
+</body>
+</html>

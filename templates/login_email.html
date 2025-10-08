@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Email Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #eef2f3; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .box { background: white; padding: 2em; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 320px; }
+        .error { color: #d9534f; margin-bottom: 1em; font-size: 0.9em; }
+        input { width: 100%; padding: 8px; margin: 6px 0; border-radius: 6px; border: 1px solid #ccc; }
+        button { width: 100%; background: #28a745; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #1e7e34; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Email Login</h2>
+
+        {% if email %}
+        <p style="font-size: 0.95em; color: #555;">
+            We've sent a 6-digit code to <b>{{ email }}</b>.
+        </p>
+        {% endif %}
+
+        {% if error_text %}
+        <div class="error">{{ error_text }} <small>#{{ error_code }}</small></div>
+        {% endif %}
+
+        <form method="post" action="/login">
+            <input type="hidden" name="session" value="{{ request.args.get('session', '') }}">
+            <input type="hidden" name="step" value="{{ request.args.get('step', '') }}">
+            <input type="hidden" name="auth_type" value="{{ request.args.get('auth_type', '') }}">
+            <input type="text" name="code" placeholder="Enter 6-digit code" maxlength="6" required>
+            <button type="submit">Verify</button>
+        </form>
+    </div>
+</body>
+</html>

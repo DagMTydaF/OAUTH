@@ -112,14 +112,14 @@ def login_with_credentials(idenity):
         if not user:
             return {
                 "success": False,
-                "error": {"text": "INVAILD IDENITY.", "code": "9x04"},
+                "error": {"text": "Invalid Username or Password.", "code": "9x04"},
                 "idenity": {}
             }
 
         if user["totp_status"] == 1 and not idenity["totp"]["complete"]:
             return {
                 "success": False,
-                "error": {"text": "TOTP REQUIRED.", "code": "9x08"},
+                "error": {"text": "Request Authenticator App.", "code": "9x08"},
                 "idenity": {"totp_secret": user["totp_secret"]}
             }
 
@@ -127,14 +127,14 @@ def login_with_credentials(idenity):
             if not (idenity["totp"]["code"] == totp(user["totp_secret"])):
                 return {
                     "success": False,
-                    "error": {"text": "TOTP REQUIRED.", "code": "9x09"},
+                    "error": {"text": "Incorrect Code Entered.", "code": "9x09"},
                     "idenity": {"totp_secret": user["totp_secret"]}
                 }
 
         if not idenity["email_otp"]["complete"]:
             return {
                 "success": False,
-                "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x10"},
+                "error": {"text": "Email Verification Reqired.", "code": "9x10"},
                 "idenity": {"username": user["username"], "email_otp": user["email_otp"], "email": user["email"]}
             }
 
@@ -142,7 +142,7 @@ def login_with_credentials(idenity):
             if not (idenity["email_otp"]["code"] == totp(user["email_otp"] + idenity["email_otp"]["offset"], interval=600)):
                 return {
                     "success": False,
-                    "error": {"text": "EMAIL OTP REQUIRED.", "code": "9x11"},
+                    "error": {"text": "Incorrect Code Entered.", "code": "9x11"},
                     "idenity": {"username": user["username"], "email_otp": user["email_otp"], "email": user["email"]}
                 }
 
