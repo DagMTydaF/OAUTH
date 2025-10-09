@@ -4,35 +4,244 @@
     <meta charset="UTF-8">
     <title>Email Login</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #eef2f3; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .box { background: white; padding: 2em; border-radius: 12px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 320px; }
-        .error { color: #d9534f; margin-bottom: 1em; font-size: 0.9em; }
-        input { width: 100%; padding: 8px; margin: 6px 0; border-radius: 6px; border: 1px solid #ccc; }
-        button { width: 100%; background: #28a745; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #1e7e34; }
+        :root {
+            --bg-primary: #eef2f3;
+            --bg-secondary: white;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --button-bg: #28a745;
+            --button-hover: #1e7e34;
+            --error-color: #dc3545;
+            --shadow: rgba(0,0,0,0.1);
+            --accent: #d4edda;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --text-primary: #eaeaea;
+            --text-secondary: #a8a8a8;
+            --border-color: #2a2a3e;
+            --button-bg: #10b981;
+            --button-hover: #059669;
+            --error-color: #ff6b6b;
+            --shadow: rgba(0,0,0,0.3);
+            --accent: #1e3a2e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: background 0.3s ease;
+        }
+
+        .container {
+            position: relative;
+            width: 400px;
+            padding: 20px;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: -50px;
+            right: 0;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            width: 60px;
+            height: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .theme-toggle::before {
+            content: '☀️';
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            width: 22px;
+            height: 22px;
+            background: var(--button-bg);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        [data-theme="dark"] .theme-toggle::before {
+            content: '🌙';
+            transform: translateX(30px);
+        }
+
+        .box {
+            background: var(--bg-secondary);
+            padding: 2.5em;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px var(--shadow);
+            animation: slideIn 0.5s ease-out;
+            transition: all 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 1.5em;
+            color: var(--text-primary);
+            font-size: 1.8em;
+        }
+
+        .info-box {
+            background: var(--accent);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 1.5em;
+            font-size: 0.95em;
+            animation: slideIn 0.6s ease-out;
+            border-left: 4px solid var(--button-bg);
+        }
+
+        .info-box b {
+            color: var(--button-bg);
+        }
+
+        .error {
+            background: var(--error-color);
+            color: white;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 1.5em;
+            font-size: 0.9em;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .input-group {
+            margin-bottom: 1.2em;
+            animation: slideIn 0.7s ease-out;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 1.5em;
+            text-align: center;
+            letter-spacing: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--button-bg);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+            letter-spacing: 2px;
+            font-size: 0.6em;
+            font-weight: normal;
+        }
+
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, var(--button-bg), var(--button-hover));
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.05em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 1em;
+            animation: slideIn 0.8s ease-out;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>Email Login</h2>
+    <div class="container">
+        <div class="theme-toggle" onclick="toggleTheme()"></div>
+        
+        <div class="box">
+            <h2>Email Login</h2>
 
-        {% if email %}
-        <p style="font-size: 0.95em; color: #555;">
-            We've sent a 6-digit code to <b>{{ email }}</b>.
-        </p>
-        {% endif %}
+            {% if email %}
+            <div class="info-box">
+                We've sent a 6-digit code to <b>{{ email }}</b>.
+            </div>
+            {% endif %}
 
-        {% if error_text %}
-        <div class="error">{{ error_text }} <small>#{{ error_code }}</small></div>
-        {% endif %}
+            {% if error_text %}
+            <div class="error">{{ error_text }} <small>#{{ error_code }}</small></div>
+            {% endif %}
 
-        <form method="post" action="/login">
-            <input type="hidden" name="session" value="{{ request.args.get('session', '') }}">
-            <input type="hidden" name="step" value="{{ request.args.get('step', '') }}">
-            <input type="hidden" name="auth_type" value="{{ request.args.get('auth_type', '') }}">
-            <input type="text" name="code" placeholder="Enter 6-digit code" maxlength="6" required>
-            <button type="submit">Verify</button>
-        </form>
+            <form method="post" action="/login">
+                <input type="hidden" name="session" value="{{ request.args.get('session', '') }}">
+                <input type="hidden" name="step" value="{{ request.args.get('step', '') }}">
+                <input type="hidden" name="auth_type" value="{{ request.args.get('auth_type', '') }}">
+                
+                <div class="input-group">
+                    <input type="text" name="code" placeholder="Enter 6-digit code" maxlength="6" required inputmode="numeric">
+                </div>
+                
+                <button type="submit">Verify</button>
+            </form>
+        </div>
     </div>
+
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
 </body>
 </html>

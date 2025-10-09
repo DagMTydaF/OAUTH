@@ -1,8 +1,11 @@
-
+import base64
+import struct
+import hmac 
 import time
 import mysql.connector
 from mysql.connector import pooling
 import random
+import hashlib
 import string
 from hashlib import sha256
 from functools import lru_cache
@@ -22,6 +25,21 @@ try:
     _conn_pool = pooling.MySQLConnectionPool(pool_name="oauth_pool", pool_size=5, **_DB_CONFIG)
 except Exception:
     _conn_pool = None 
+
+def _decoded_key(secret_normalized: str):
+    return base64.b32decode(secret_normalized, casefold=True)
+
+def totp(secret, digits=6, interval=30):
+    secret_norm = secret.strip().replace(" ", "").upper()
+    key_bytes = _decoded_key(secret_norm)
+    timestep = int(time.time() // interval)
+
+    msg = struct.pack(">Q", timestep)
+    h = hmac.new(key_bytes, msg, hashlib.sha1).digest()
+
+    offset = h[-1] & 0x0F
+    code = (struct.unpack(">I", h[offset:offset+4])[0] & 0x7fffffff) % (10 ** digits)
+    return str(code).zfill(digits)
 
 def get_conn():
     if _conn_pool:
@@ -85,22 +103,30 @@ def generate_user_id(username, offset):
     user_id = int.from_bytes(hash_bytes[:8], "big")
     return user_id
 
-def register(username, password, email, phone, totp=(False, ""), email_otp=(False, "", "")):
+def register(username, password, email, phone, totp_mfa={"code": None, "secret": None, "complete": False}, email_otp={"code": None, "secret": None, "complete": False}):
     unsecure_numbers = ("381", "7", "387")
 
     if not username_valid(username.lower()):
         return {
             "success": False,
             "error": {"text": "Username Taken.", "code": "8x01"},
-            "user": {}
+            "identity": {}
         }
 
-    if phone.startswith(unsecure_numbers) and not totp[0]:
+    if phone.startswith(unsecure_numbers) and not totp_mfa["complete"] and not email_otp["complete"]:
         return {
             "success": False,
-            "error": {"text": "TOTP REQUIRED.", "code": "8x02"},
-            "user": {}
+            "error": {"text": "Authenticator App Required.", "code": "8x02"},
+            "identity": {}
         }
+
+    elif phone.startswith(unsecure_numbers) and totp_mfa["complete"] and not email_otp["complete"]:
+        if not totp_mfa["code"] == totp(totp_mfa["secret"]):
+             return {
+                "success": False,
+                "error": {"text": "Incorrect Code Entered.", "code": "8x08"},
+                "identity": {}
+            }
 
     while True:
         token = generate_token()
@@ -117,10 +143,17 @@ def register(username, password, email, phone, totp=(False, ""), email_otp=(Fals
     password_hash = sha256(password.encode()).hexdigest()
     rhash = sha256(f"{username.lower()}{email}".encode()).hexdigest()
 
-    if not email_otp[1]:
+    if not email_otp["complete"]:
         return {
             "success": False,
-            "error": {"text": "EMAIL OTP REQUIRED.", "code": "8x03"},
+            "error": {"text": "Email Verification Required.", "code": "8x03"},
+            "user": {}
+        }
+
+    elif not (email_otp["code"] == totp(email_otp["secret"], interval=600)):
+        return {
+            "success": False,
+            "error": {"text": "Incorrect Code Enterd.", "code": "8x09"},
             "user": {}
         }
 
@@ -136,18 +169,19 @@ def register(username, password, email, phone, totp=(False, ""), email_otp=(Fals
             user_id,
             username.lower(),
             password_hash,
-            totp[0],
-            totp[1] if totp[0] else "",
-            email_otp[1],
+            totp_mfa["complete"],
+            totp_mfa["secret"] if totp_mfa["complete"] else "",
+            email_otp["secret"],
             token,
             sha256(str(token).encode()).hexdigest(),
             rhash,
-            "q1-high" if totp[0] else "q0-high",
+            "q1-high" if totp_mfa["complete"] else "q0-high",
             email,
             phone
         )
         cursor.execute(sql, values)
         conn.commit()
+
     finally:
         try:
             cursor.close()
@@ -162,8 +196,9 @@ def register(username, password, email, phone, totp=(False, ""), email_otp=(Fals
     return {
         "success": True,
         "error": None,
-        "user": {
-            "user_id": user_id,
+        "idenity": {
+            "userid": user_id,
+            "username": username,
             "rhash": rhash,
             "token": token
         }

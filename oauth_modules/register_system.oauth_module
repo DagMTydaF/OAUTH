@@ -3,4 +3,4 @@ id$RSYS
 discription$User Register System
 workfolder$%root%/register_system
 runfile$source.py
-functions$!register&*username&*password&*email&*phone&totp&email_otp!username_vaild&*username!token_valid&*token!generate_token&length
+functions$!register&*username&*password&*email&*phone&totp_mfa&email_otp!username_vaild&*username!token_valid&*token!generate_token&length
