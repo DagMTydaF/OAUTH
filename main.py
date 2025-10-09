@@ -459,6 +459,22 @@ def login_post():
 
 @app.route("/login", methods=["GET"])
 def login_get():
+    secret = "mF8Zqv7QyRk1pXJwN6TgHsV9aB3uL0cD5eKj2YhWfA"
+
+    cookies = request.cookies.to_dict()
+
+    if cookies.get("token"):
+        request_session = {
+            "expire": int(cookies.get("expire", 0)),
+            "id": cookies.get("session_id")
+        }
+
+
+        jwt_session = verify_jwt_token(cookies.get("token"), request_session, secret)
+
+        if jwt_session is True:
+            return redirect(url_for("home"))
+
     session = request.args.get("session")
 
     if "session" not in request.args or not login_sessions.get(session, {}):
@@ -581,6 +597,22 @@ def register_post():
 
 @app.route("/register", methods=["GET"])
 def register_get():
+    secret = "mF8Zqv7QyRk1pXJwN6TgHsV9aB3uL0cD5eKj2YhWfA"
+
+    cookies = request.cookies.to_dict()
+
+    if cookies.get("token"):
+        request_session = {
+            "expire": int(cookies.get("expire", 0)),
+            "id": cookies.get("session_id")
+        }
+
+
+        jwt_session = verify_jwt_token(cookies.get("token"), request_session, secret)
+
+        if jwt_session is True:
+            return redirect(url_for("home"))
+
     session = request.args.get("session")
 
     if "session" not in request.args or not register_sessions.get(session, {}):
